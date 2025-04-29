@@ -1,0 +1,121 @@
+{
+  "entities": [
+    "communications analytics platform",
+    "GlobalComms Inc.",
+    "data analytics in PR measurement",
+    "strategic communications",
+    "executive communications coaching",
+    "communications leadership",
+    "Public Relations Society",
+    "VP of Public Relations",
+    "crisis communications",
+    "Virtual Media Strategy Session",
+    "PR Leadership Conference",
+    "media relationship building",
+    "Communications Leadership Forum",
+    "communications strategy framework",
+    "Rachel Miller",
+    "Crisis Communications in Digital Age"
+  ],
+  "relations": [
+    [
+      "Rachel Miller",
+      "attended",
+      "PR Leadership Conference"
+    ],
+    [
+      "Rachel Miller",
+      "collaborated_with",
+      "Crisis Communications in Digital Age"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "executive communications coaching"
+    ],
+    [
+      "Rachel Miller",
+      "part_of",
+      "Public Relations Society"
+    ],
+    [
+      "Rachel Miller",
+      "attended",
+      "Communications Leadership Forum"
+    ],
+    [
+      "Rachel Miller",
+      "works_at",
+      "GlobalComms Inc."
+    ],
+    [
+      "Rachel Miller",
+      "interested_in",
+      "communications analytics platform"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "crisis communications"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "data analytics in PR measurement"
+    ],
+    [
+      "Rachel Miller",
+      "attended",
+      "Virtual Media Strategy Session"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "communications leadership"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "strategic communications"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "media relationship building"
+    ]
+  ],
+  "edges": [
+    "attended",
+    "interested_in",
+    "part_of",
+    "collaborated_with",
+    "works_at",
+    "skilled_in"
+  ],
+  "entity_types": {
+    "Rachel Miller": "Person",
+    "VP of Public Relations": "Role",
+    "GlobalComms Inc.": "Company",
+    "Communications Leadership Forum": "Event",
+    "Crisis Communications in Digital Age": "Project",
+    "Virtual Media Strategy Session": "Event",
+    "PR Leadership Conference": "Event",
+    "communications strategy framework": "Project",
+    "communications analytics platform": "Project",
+    "communications leadership": "Skill",
+    "crisis communications": "Skill",
+    "media relationship building": "Skill",
+    "data analytics in PR measurement": "Skill",
+    "Public Relations Society": "Company",
+    "executive communications coaching": "Skill",
+    "strategic communications": "Skill"
+  },
+  "edge_types": {
+    "works_at": "works_at",
+    "attended": "attended",
+    "collaborated_with": "collaborated_with",
+    "interested_in": "interested_in",
+    "skilled_in": "skilled_in",
+    "part_of": "part_of"
+  }
+}

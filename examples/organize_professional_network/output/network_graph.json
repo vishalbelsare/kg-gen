@@ -1,0 +1,196 @@
+{
+  "entities": [
+    "GlobalComms Inc.",
+    "data analytics in PR measurement",
+    "AI integration",
+    "ROI of digital initiatives",
+    "VP of Public Relations",
+    "crisis communications",
+    "change management strategies",
+    "Certified Digital Transformation Professional",
+    "cloud migration",
+    "communications strategy framework",
+    "Rachel Miller",
+    "communications analytics platform",
+    "Legacy System Modernization",
+    "communications leadership",
+    "Digital Strategy Summit",
+    "Virtual Media Strategy Session",
+    "digital transformation roadmap",
+    "MBA with focus on technology management",
+    "digital leadership roles",
+    "Alexander Nguyen",
+    "transformation methodology",
+    "executive communications coaching",
+    "strategic communications",
+    "Technology Conference",
+    "Director of Digital Transformation",
+    "CIO Magazine",
+    "CIO",
+    "Digital Leadership Forum",
+    "midsize manufacturing company",
+    "Public Relations Society",
+    "Enterprise Solutions",
+    "Virtual Strategy Session",
+    "PR Leadership Conference",
+    "media relationship building",
+    "Communications Leadership Forum",
+    "Crisis Communications in Digital Age"
+  ],
+  "relations": [
+    [
+      "Alexander Nguyen",
+      "works_at",
+      "CIO Magazine"
+    ],
+    [
+      "Rachel Miller",
+      "collaborated_with",
+      "Crisis Communications in Digital Age"
+    ],
+    [
+      "Alexander Nguyen",
+      "skilled_in",
+      "MBA with focus on technology management"
+    ],
+    [
+      "Alexander Nguyen",
+      "collaborated_with",
+      "cloud migration"
+    ],
+    [
+      "Rachel Miller",
+      "attended",
+      "Virtual Media Strategy Session"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "communications leadership"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "strategic communications"
+    ],
+    [
+      "Alexander Nguyen",
+      "part_of",
+      "Digital Leadership Forum"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "media relationship building"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "executive communications coaching"
+    ],
+    [
+      "Alexander Nguyen",
+      "interested_in",
+      "transformation methodology"
+    ],
+    [
+      "Alexander Nguyen",
+      "skilled_in",
+      "change management strategies"
+    ],
+    [
+      "Rachel Miller",
+      "interested_in",
+      "communications analytics platform"
+    ],
+    [
+      "Alexander Nguyen",
+      "skilled_in",
+      "AI integration"
+    ],
+    [
+      "Alexander Nguyen",
+      "attended",
+      "Virtual Strategy Session"
+    ],
+    [
+      "Rachel Miller",
+      "works_at",
+      "GlobalComms Inc."
+    ],
+    [
+      "Alexander Nguyen",
+      "skilled_in",
+      "Certified Digital Transformation Professional"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "data analytics in PR measurement"
+    ],
+    [
+      "Alexander Nguyen",
+      "attended",
+      "Technology Conference"
+    ],
+    [
+      "Alexander Nguyen",
+      "collaborated_with",
+      "digital transformation roadmap"
+    ],
+    [
+      "Rachel Miller",
+      "attended",
+      "PR Leadership Conference"
+    ],
+    [
+      "Alexander Nguyen",
+      "attended",
+      "Digital Strategy Summit"
+    ],
+    [
+      "Rachel Miller",
+      "attended",
+      "Communications Leadership Forum"
+    ],
+    [
+      "Rachel Miller",
+      "part_of",
+      "Public Relations Society"
+    ],
+    [
+      "Alexander Nguyen",
+      "works_at",
+      "Enterprise Solutions"
+    ],
+    [
+      "Alexander Nguyen",
+      "collaborated_with",
+      "Legacy System Modernization"
+    ],
+    [
+      "Rachel Miller",
+      "skilled_in",
+      "crisis communications"
+    ],
+    [
+      "Alexander Nguyen",
+      "collaborated_with",
+      "ROI of digital initiatives"
+    ],
+    [
+      "Alexander Nguyen",
+      "leads",
+      "digital leadership roles"
+    ]
+  ],
+  "edges": [
+    "attended",
+    "leads",
+    "interested_in",
+    "part_of",
+    "collaborated_with",
+    "works_at",
+    "skilled_in"
+  ]
+}

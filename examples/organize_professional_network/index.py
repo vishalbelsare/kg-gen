@@ -84,40 +84,126 @@ def process_single_file(file_path: str):
     output_dir = os.path.join(os.path.dirname(os.path.dirname(file_path)), "output", person_name)
     os.makedirs(output_dir, exist_ok=True)
     
-    # First extract entities only to avoid empty literal issue
-    import dspy
-    from src.kg_gen.steps._1_get_entities import get_entities
-    
-    # Initialize DSPy
-    dspy_module = kg_gen.dspy
-    
-    # Get entities first with strict typing
-    entities_result = get_entities(
-        dspy_module,
-        content,
-        is_conversation=False,
-        node_types=ENTITY_TYPES,
-        require_node_type=True  # Enforce that all extracted entities must have a type from ENTITY_TYPES
-    )
-    
-    # Skip if no entities found
-    if not entities_result or len(entities_result) == 0:
-        print(f"No entities found in {person_name}, skipping...")
-        return None
-    
-    # Now generate the full graph with the extracted entities, enforcing strict node and edge typing
-    person_graph = kg_gen.generate(
-        input_data=content,
-        context="Professional networking and relationship notes. Strictly enforce all entity and relationship types.",
-        node_type=ENTITY_TYPES,  # Restrict to only these node types
-        edge_type=EDGE_TYPES,    # Restrict to only these edge types
-        require_node_type=True,  # Every entity MUST have one of the specified types
-        require_edge_type=True,  # Every relation MUST have one of the specified types
-        cluster=True,
-        output_folder=output_dir
-    )
-    
-    return person_graph
+    # Create a custom implementation that avoids the Literal type issue
+    try:
+        # Extract entities and relations directly with DSPy to avoid the Literal type error
+        import dspy
+        
+        # Initialize DSPy with the model
+        dspy_module = kg_gen.dspy
+        
+        class CustomEntitiesWithTypes(dspy.Signature):
+            """Extract key entities from the text and assign types to them.
+            This is for building a professional network knowledge graph.
+            Only use the allowed entity types."""
+            
+            text: str = dspy.InputField()
+            allowed_types: list[str] = dspy.InputField(desc="List of allowed entity types")
+            entities: list[dict] = dspy.OutputField(desc="List of entities with their types as {entity: str, type: str}")
+        
+        class CustomRelationsWithTypes(dspy.Signature):
+            """Extract relationships between entities in the text.
+            This is for building a professional network knowledge graph.
+            Only use the allowed relationship types."""
+            
+            text: str = dspy.InputField()
+            entities: list[dict] = dspy.InputField(desc="List of entities with their types")
+            allowed_relation_types: list[str] = dspy.InputField(desc="List of allowed relationship types")
+            relations: list[dict] = dspy.OutputField(desc="List of relations as {subject: str, predicate: str, object: str, type: str}")
+        
+        # Extract entities with types
+        extract_entities = dspy.Predict(CustomEntitiesWithTypes)
+        entities_result = extract_entities(
+            text=content,
+            allowed_types=ENTITY_TYPES
+        )
+        
+        # Prepare entities for relation extraction
+        entities = [item["entity"] for item in entities_result.entities]
+        entity_types = {item["entity"]: item["type"] for item in entities_result.entities if "type" in item}
+        
+        # Skip if no entities found
+        if not entities or len(entities) == 0:
+            print(f"No entities found in {person_name}, skipping...")
+            return None
+        
+        # Extract relations with types
+        extract_relations = dspy.Predict(CustomRelationsWithTypes)
+        relations_result = extract_relations(
+            text=content,
+            entities=entities_result.entities,
+            allowed_relation_types=EDGE_TYPES
+        )
+        
+        # Prepare relations
+        relations = []
+        relation_types = {}
+        
+        for rel in relations_result.relations:
+            if "subject" in rel and "predicate" in rel and "object" in rel:
+                relations.append((rel["subject"], rel["predicate"], rel["object"]))
+                if "type" in rel:
+                    relation_types[rel["predicate"]] = rel["type"]
+        
+        # Create a graph manually
+        from src.kg_gen.models import Graph
+        
+        graph = Graph(
+            entities=set(entities),
+            relations=set(relations),
+            edges={rel[1] for rel in relations},
+            entity_types=entity_types,
+            edge_types=relation_types
+        )
+        
+        # Save the graph
+        import json
+        
+        graph_dict = {
+            'entities': list(graph.entities),
+            'relations': [list(r) for r in graph.relations],
+            'edges': list(graph.edges),
+            'entity_types': graph.entity_types,
+            'edge_types': graph.edge_types
+        }
+        
+        with open(os.path.join(output_dir, 'graph.json'), 'w') as f:
+            json.dump(graph_dict, f, indent=2)
+            
+        return graph
+        
+    except Exception as e:
+        print(f"Error in custom implementation for {person_name}: {str(e)}")
+        
+        # Fallback to a simpler approach that doesn't use the Pydantic Literal type
+        try:
+            # Use a simpler approach without Pydantic models that use Literal
+            content_with_context = f"""
+Professional Network Knowledge Graph
+-----------------------------------
+Entity Types: {', '.join(ENTITY_TYPES)}
+Relationship Types: {', '.join(EDGE_TYPES)}
+-----------------------------------
+
+{content}
+"""
+            # Generate a simple graph without clustering to avoid the error
+            person_graph = kg_gen.generate(
+                input_data=content_with_context,
+                context="Professional networking and relationship notes. Extract entities and relationships for a professional network.",
+                node_type=ENTITY_TYPES,
+                edge_type=EDGE_TYPES,
+                require_node_type=True,
+                require_edge_type=True,
+                cluster=False,  # Skip clustering to avoid additional errors
+                output_folder=output_dir
+            )
+            
+            return person_graph
+            
+        except Exception as e2:
+            print(f"Both approaches failed for {person_name}: {str(e2)}")
+            return None
 
 def generate_professional_network_kg():
     """
@@ -127,8 +213,16 @@ def generate_professional_network_kg():
     people_dir = os.path.join(os.path.dirname(__file__), "people")
     markdown_files = glob.glob(os.path.join(people_dir, "*.md"))
     
-    # Limit to a few files for testing
-    markdown_files = markdown_files[:2]  # Start with just 2 files for testing
+    # Process just the example file for testing
+    example_file = os.path.join(people_dir, "example.md")
+    if os.path.exists(example_file):
+        print("Processing the example file for testing")
+        markdown_files = [example_file]
+    elif markdown_files:
+        print(f"Found {len(markdown_files)} markdown files, processing first one for testing")
+        markdown_files = markdown_files[:1]  # Start with just 1 file for testing
+    else:
+        print("No markdown files found in directory:", people_dir)
     
     # Process each file individually
     all_graphs = []
@@ -189,4 +283,9 @@ def generate_professional_network_kg():
         return None
 
 if __name__ == "__main__":
-    generate_professional_network_kg()
+    try:
+        generate_professional_network_kg()
+    except Exception as e:
+        print(f"Error in main execution: {str(e)}")
+        import traceback
+        traceback.print_exc()
