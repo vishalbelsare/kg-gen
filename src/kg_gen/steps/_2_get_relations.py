@@ -4,7 +4,8 @@ from pydantic import BaseModel, create_model
 
 
 def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conversation: bool = False) -> List[str]:
-  
+  print(input_data)
+  print(entities)
   class Relation(BaseModel):
     "Knowledge graph subject-predicate-object tuple"
     subject: Literal[tuple(entities)]
@@ -31,6 +32,7 @@ def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conv
     source_text: str = dspy.InputField()
     entities: list[str] = dspy.InputField()
     relations: list[Relation] = dspy.OutputField(desc="List of subject-predicate-object tuples where subject and object are exact matches to items in entities list. Be thorough")
+  
   if is_conversation:
     extract = dspy.Predict(ExtractConversationRelations)
   else:

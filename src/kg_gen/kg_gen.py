@@ -134,7 +134,7 @@ class KGGen:
         return chunk_entities, chunk_relations
       
       # Process chunks in parallel using ThreadPoolExecutor with max 8 workers
-      with ThreadPoolExecutor(max_workers=8) as executor: 
+      with ThreadPoolExecutor() as executor: 
         results = list(executor.map(process_chunk, chunks))
       
       # Combine results

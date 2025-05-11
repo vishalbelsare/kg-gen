@@ -28,8 +28,8 @@ if __name__ == "__main__":
   # Generate graph from wiki text with chunking
   graph_chunked = kg.generate(
     input_data=text,
-    model="openai/gpt-4o",
-    api_key=os.getenv("OPENAI_API_KEY"),
+    model="gemini/gemini-2.5-flash-preview-04-17",
+    api_key=os.getenv("GEMINI_API_KEY"),
     chunk_size=1000
   )
   print("\nWith chunking:")
