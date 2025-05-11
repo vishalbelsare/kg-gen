@@ -280,6 +280,7 @@ def clean_rows_article_no_response(split_name: Literal["train", "test", "validat
 
 # Generate a KG from the cleaned dataset
 
+
 def generate_kg_from_clean_dataset(
     split_name: Literal["train", "test", "validation"], thread_count: int = 1
 ):
@@ -308,8 +309,7 @@ def generate_kg_from_clean_dataset(
 
                 with open(article_path, "r") as f:
                     article = f.read()
-                    
-                
+
                 # Chunked
                 graph_chunked_2048 = kg.generate(
                     input_data=article,
@@ -318,17 +318,16 @@ def generate_kg_from_clean_dataset(
                     chunk_size=2048,
                     chunk_overlap=246,
                 )
-                
-                
+
                 # --- ABLATIONS for later  ---
-                    
+
                 # Not chunked
                 # graph_unchunked = kg.generate(
                 #     input_data=article,
                 #     model="gemini/gemini-2.0-flash",
                 #     api_key=os.getenv("GEMINI_API_KEY")
                 # )
-                
+
                 # graph_chunked_4096= kg.generate(
                 #     input_data=article,
                 #     model="gemini/gemini-2.0-flash",
@@ -336,7 +335,7 @@ def generate_kg_from_clean_dataset(
                 #     chunk_size=4096,
                 #     chunk_overlap=492,
                 # )
-                
+
                 # graph_chunked_2048_context_str = kg.generate(
                 #     input_data=article,
                 #     model="gemini/gemini-2.0-flash",
@@ -345,7 +344,7 @@ def generate_kg_from_clean_dataset(
                 #     chunk_overlap=246,
                 #     context_str=""
                 # )
-                
+
                 # graph_chunked_2048_with_node_edge_types = kg.generate(
                 #     input_data=article,
                 #     model="gemini/gemini-2.0-flash",
@@ -355,9 +354,9 @@ def generate_kg_from_clean_dataset(
                 #     node_types=[],
                 #     edge_types=[],
                 # )
-                
+
                 # ---
-                
+
                 with open(output_kg_path, "w") as f:
                     f.write(graph_chunked_2048.model_dump_json(indent=4))
                 print(f"Saved knowledge graph for '{title}' to {output_kg_path}")
@@ -415,44 +414,47 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
         api_key=os.getenv("GEMINI_API_KEY"),
     )
     os.makedirs(OUTPUT_KG_DIR, exist_ok=True)
-    
+
     # Get all article files
     article_files = [f for f in os.listdir(OUTPUT_ARTICLES_DIR) if f.endswith('.txt')]
     # article_files = ["Richard_Nixon.txt"]
-    
+    article_files = article_files[1000:]
+
     # Track failures
     missing_files = []
     generation_errors = []
-    
-    def process_article(article_file):
+
+    def process_article(article_file, attempt: int = 0):
         article_path = os.path.join(OUTPUT_ARTICLES_DIR, article_file)
         title = os.path.splitext(article_file)[0]
-        
+
         try:
             output_kg_path = os.path.join(OUTPUT_KG_DIR, f"{title}.json")
             if os.path.exists(output_kg_path):
                 print(f"KG already exists for '{title}'")
                 return {"status": "skipped", "title": title}
-                
+
             with open(article_path, "r") as f:
                 article = f.read()
-            
+
             # Generate KG with chunking
             graph_chunked = kg.generate(
                 input_data=article,
                 chunk_size=2048,
                 chunk_overlap=246,
             )
-            
+
             with open(output_kg_path, "w") as f:
                 f.write(graph_chunked.model_dump_json(indent=4))
             print(f"Saved knowledge graph for '{title}' to {output_kg_path}")
             return {"status": "success", "title": title}
         except Exception as e:
+            if attempt < 10:
+                return process_article(article_file, attempt + 1)
             error_info = {"title": title, "error": str(e)}
             print(f"Error generating KG for '{title}': {e}")
             return {"status": "generation_error", "data": error_info}
-    
+
     # Process articles based on thread count
     if thread_count <= 1:
         # Process articles sequentially without threading
@@ -461,20 +463,25 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
         # Process articles using ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=thread_count) as executor:
             results = list(executor.map(process_article, article_files))
-    
+
     # Process results
     for result in results:
         if result["status"] == "generation_error":
             generation_errors.append(result["data"])
-    
+
     # Save error logs
     if generation_errors:
         errors_path = os.path.join(OUTPUT_KG_DIR, "all_articles_generation_errors.json")
         with open(errors_path, "w") as f:
             json.dump(generation_errors, f, indent=4)
-        print(f"Saved {len(generation_errors)} generation error records to {errors_path}")
-    
-    print(f"Processed {len(article_files)} articles, with {len(generation_errors)} errors")
+        print(
+            f"Saved {len(generation_errors)} generation error records to {errors_path}"
+        )
+
+    print(
+        f"Processed {len(article_files)} articles, with {len(generation_errors)} errors"
+    )
+
 
 if __name__ == "__main__":
     splits = ["train", "test", "validation"]
@@ -484,4 +491,4 @@ if __name__ == "__main__":
     #     clean_rows_article_no_response(split)
 
     for split in ["test"]:
-        generate_kgs_for_all_articles(thread_count=64)
+        generate_kgs_for_all_articles(thread_count=4)
