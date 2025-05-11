@@ -491,4 +491,4 @@ if __name__ == "__main__":
     #     clean_rows_article_no_response(split)
 
     for split in ["test"]:
-        generate_kgs_for_all_articles(thread_count=4)
+        generate_kgs_for_all_articles(thread_count=128)
