@@ -199,7 +199,7 @@ def retrieve_articles_for_split(split_name: Literal["train", "test", "validation
 # ------
 # Remove rows where the article doesn't contain the correct answer
 lm = dspy.LM(
-    "gemini/gemini-2.5-flash-preview-04-17",
+    "gemini/gemini-2.0-flash",
     api_key=os.getenv("GOOGLE_API_KEY"),
     temperature=0,
     max_tokens=1000000,
@@ -309,18 +309,58 @@ def generate_kg_from_clean_dataset(
 
                 with open(article_path, "r") as f:
                     article = f.read()
-
-                graph_chunked = kg.generate(
+                    
+                
+                # Chunked
+                graph_chunked_2048 = kg.generate(
                     input_data=article,
-                    model="gemini/gemini-2.5-flash-preview-04-17",
+                    model="gemini/gemini-2.0-flash",
                     api_key=os.getenv("GEMINI_API_KEY"),
                     chunk_size=2048,
+                    chunk_overlap=246,
                 )
-                # print("graph_chunked", graph_chunked)
                 
-
+                
+                # --- ABLATIONS for later  ---
+                    
+                # Not chunked
+                # graph_unchunked = kg.generate(
+                #     input_data=article,
+                #     model="gemini/gemini-2.0-flash",
+                #     api_key=os.getenv("GEMINI_API_KEY")
+                # )
+                
+                # graph_chunked_4096= kg.generate(
+                #     input_data=article,
+                #     model="gemini/gemini-2.0-flash",
+                #     api_key=os.getenv("GEMINI_API_KEY"),
+                #     chunk_size=4096,
+                #     chunk_overlap=492,
+                # )
+                
+                # graph_chunked_2048_context_str = kg.generate(
+                #     input_data=article,
+                #     model="gemini/gemini-2.0-flash",
+                #     api_key=os.getenv("GEMINI_API_KEY"),
+                #     chunk_size=2048,
+                #     chunk_overlap=246,
+                #     context_str=""
+                # )
+                
+                # graph_chunked_2048_with_node_edge_types = kg.generate(
+                #     input_data=article,
+                #     model="gemini/gemini-2.0-flash",
+                #     api_key=os.getenv("GEMINI_API_KEY"),
+                #     chunk_size=2048,
+                #     chunk_overlap=246,
+                #     node_types=[],
+                #     edge_types=[],
+                # )
+                
+                # ---
+                
                 with open(output_kg_path, "w") as f:
-                    f.write(graph_chunked.model_dump_json(indent=4))
+                    f.write(graph_chunked_2048.model_dump_json(indent=4))
                 print(f"Saved knowledge graph for '{title}' to {output_kg_path}")
                 return {"status": "success", "title": title}
             except Exception as e:

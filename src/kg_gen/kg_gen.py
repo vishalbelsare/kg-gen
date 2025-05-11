@@ -54,7 +54,7 @@ class KGGen:
       
     # Initialize dspy LM with current settings
     if self.api_key:
-      self.lm = dspy.LM(model=self.model, api_key=self.api_key, temperature=self.temperature, max_tokens=20000)
+      self.lm = dspy.LM(model=self.model, api_key=self.api_key, temperature=self.temperature, max_tokens=16384)
     else:
       self.lm = dspy.LM(model=self.model, temperature=self.temperature)
       
@@ -71,10 +71,11 @@ class KGGen:
     #   List[Tuple[Tuple[str, str], str, Tuple[str, str]]]
     # ]] = None,
     chunk_size: Optional[int] = None,
+    chunk_overlap: Optional[int] = None,    
     cluster: bool = False,
     temperature: float = None,
-    # node_labels: Optional[List[str]] = None,
-    # edge_labels: Optional[List[str]] = None,
+    # node_types: Optional[List[str]] = None,
+    # edge_types: Optional[List[str]] = None,
     # ontology: Optional[List[Tuple[str, str, str]]] = None,
     output_folder: Optional[str] = None
   ) -> Graph:
@@ -123,7 +124,7 @@ class KGGen:
       entities = get_entities(self.dspy, processed_input, is_conversation=is_conversation)
       relations = get_relations(self.dspy, processed_input, entities, is_conversation=is_conversation)
     else:
-      chunks = chunk_text(processed_input, chunk_size)
+      chunks = chunk_text(processed_input, chunk_size, chunk_overlap)
       entities = set()
       relations = set()
 
@@ -131,11 +132,11 @@ class KGGen:
         chunk_entities = get_entities(self.dspy, chunk, is_conversation=is_conversation)
         chunk_relations = get_relations(self.dspy, chunk, chunk_entities, is_conversation=is_conversation)
         return chunk_entities, chunk_relations
-
-      # Process chunks in parallel using ThreadPoolExecutor
-      with ThreadPoolExecutor() as executor:
+      
+      # Process chunks in parallel using ThreadPoolExecutor with max 8 workers
+      with ThreadPoolExecutor(max_workers=8) as executor: 
         results = list(executor.map(process_chunk, chunks))
-        
+      
       # Combine results
       for chunk_entities, chunk_relations in results:
         entities.update(chunk_entities)
