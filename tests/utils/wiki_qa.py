@@ -416,12 +416,7 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
     os.makedirs(OUTPUT_KG_DIR, exist_ok=True)
 
     # Get all article files
-    article_files = [f for f in os.listdir(OUTPUT_ARTICLES_DIR) if f.endswith('.txt')]
-    # article_files = ["Richard_Nixon.txt"]
-    article_files = article_files[1000:]
-
-    # Track failures
-    missing_files = []
+    article_files = [f for f in os.listdir(OUTPUT_ARTICLES_DIR) if f.endswith(".txt")]
     generation_errors = []
 
     def process_article(article_file, attempt: int = 0):
@@ -450,6 +445,7 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
             return {"status": "success", "title": title}
         except Exception as e:
             if attempt < 10:
+                print(f"Retrying {article_file} ({attempt + 1}/10)")
                 return process_article(article_file, attempt + 1)
             error_info = {"title": title, "error": str(e)}
             print(f"Error generating KG for '{title}': {e}")
@@ -490,5 +486,4 @@ if __name__ == "__main__":
     #     retrieve_articles_for_split(split)
     #     clean_rows_article_no_response(split)
 
-    for split in ["test"]:
-        generate_kgs_for_all_articles(thread_count=128)
+    generate_kgs_for_all_articles(thread_count=64)
