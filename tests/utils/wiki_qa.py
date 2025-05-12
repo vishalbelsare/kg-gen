@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Literal
-from kg_gen.kg_gen import KGGen
+from kg_gen.kg_gen import KGGen, Graph
 import pandas as pd
 import os
 import requests
@@ -412,6 +412,7 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
     kg = KGGen(
         model="gemini/gemini-2.0-flash",
         api_key=os.getenv("GEMINI_API_KEY"),
+        # temperature=0.98
     )
     os.makedirs(OUTPUT_KG_DIR, exist_ok=True)
 
@@ -478,6 +479,61 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
         f"Processed {len(article_files)} articles, with {len(generation_errors)} errors"
     )
 
+def aggregate_all_kgs():
+    """
+    Aggregate all knowledge graphs in the OUTPUT_KG_DIR into a single combined graph.
+    
+    Returns:
+        Graph: The combined knowledge graph
+    """
+
+    print(f"Aggregating all knowledge graphs from {OUTPUT_KG_DIR}...")
+    
+    # Initialize KGGen
+    kg = KGGen()
+    
+    # Get all KG files
+    kg_files = []
+    for root, _, files in os.walk(OUTPUT_KG_DIR):
+        for file in files:
+            if file.endswith('.json') and not file.endswith('_errors.json'):
+                kg_files.append(os.path.join(root, file))
+    
+    print(f"Found {len(kg_files)} knowledge graph files")
+    
+    # Load all graphs
+    graphs = []
+    for kg_file in kg_files:
+        try:
+            with open(kg_file, 'r') as f:
+                graph_data = json.load(f)
+            
+            # Create Graph object from the loaded data
+            graph = Graph(
+                entities=set(graph_data.get('entities', [])),
+                relations=set(tuple(r) for r in graph_data.get('relations', [])),
+                edges=set(graph_data.get('edges', []))
+            )
+            graphs.append(graph)
+        except Exception as e:
+            print(f"Error loading graph from {kg_file}: {e}")
+    
+    # Aggregate all graphs
+    if graphs:
+        combined_graph = kg.aggregate(graphs)
+        
+        # Save the combined graph
+        output_path = os.path.join(OUTPUT_KG_DIR, 'combined_graph.json')
+        with open(output_path, 'w') as f:
+            f.write(combined_graph.model_dump_json(indent=4))
+        
+        print(f"Combined graph saved to {output_path}")
+        print(f"Combined graph stats: {len(combined_graph.entities)} entities, {len(combined_graph.relations)} relations")
+        
+        return combined_graph
+    else:
+        print("No valid graphs found to aggregate")
+        return None
 
 if __name__ == "__main__":
     splits = ["train", "test", "validation"]
@@ -486,4 +542,5 @@ if __name__ == "__main__":
     #     retrieve_articles_for_split(split)
     #     clean_rows_article_no_response(split)
 
-    generate_kgs_for_all_articles(thread_count=64)
+    # generate_kgs_for_all_articles(thread_count=64)
+    aggregate_all_kgs()
