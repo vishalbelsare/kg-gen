@@ -119,10 +119,15 @@ class KGGen:
         temperature=temperature or self.temperature,
         api_key=api_key or self.api_key
       )
+      
+    entities_chunk_ids = {}
+    relations_chunk_ids = {}
+    edges_chunk_ids = {}
     
     if not chunk_size:
       entities = get_entities(self.dspy, processed_input, is_conversation=is_conversation)
       relations = get_relations(self.dspy, processed_input, entities, is_conversation=is_conversation)
+      
     else:
       chunks = chunk_text(processed_input, chunk_size, chunk_overlap)
       entities = set()
@@ -138,14 +143,26 @@ class KGGen:
         results = list(executor.map(process_chunk, chunks))
       
       # Combine results
-      for chunk_entities, chunk_relations in results:
+      for i, data in enumerate(results):
+        chunk_entities, chunk_relations = data
         entities.update(chunk_entities)
         relations.update(chunk_relations)
+        
+        # preserve chunk ids
+        for entity in chunk_entities:
+          entities_chunk_ids[entity] = i
+        for relation in chunk_relations:
+          relations_chunk_ids[f"{relation[0]}-{relation[1]}-{relation[2]}"] = i
+          edges_chunk_ids[relation[1]] = i
+        
     
     graph = Graph(
       entities = entities,
       relations = relations,
-      edges = {relation[1] for relation in relations}
+      edges = {relation[1] for relation in relations},
+      entities_chunk_ids = entities_chunk_ids,
+      relations_chunk_ids = relations_chunk_ids,
+      edges_chunk_ids = edges_chunk_ids
     )
     
     if cluster:

@@ -444,7 +444,7 @@ def generate_kgs_for_all_articles(thread_count: int = 1):
             print(f"Saved knowledge graph for '{title}' to {output_kg_path}")
             return {"status": "success", "title": title}
         except Exception as e:
-            if attempt < 10:
+            if attempt < 20:
                 print(f"Retrying {article_file} ({attempt + 1}/10)")
                 return process_article(article_file, attempt + 1)
             error_info = {"title": title, "error": str(e)}
