@@ -10,39 +10,44 @@ import dspy
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
-  
+
 class KGGen:
   def __init__(
     self,
     model: str = "openai/gpt-4o",
     temperature: float = 0.0,
-    api_key: str = None
+    api_key: str = None,
+    api_base: str = None
   ):
     """Initialize KGGen with optional model configuration
-    
+
     Args:
         model: Name of model to use (e.g. 'gpt-4')
         temperature: Temperature for model sampling
         api_key: API key for model access
+        api_base: Specify the base URL endpoint for making API calls to a language model service
     """
     self.dspy = dspy
     self.model = model
     self.temperature = temperature
     self.api_key = api_key
-    self.init_model(model, temperature, api_key)
-      
+    self.api_base = api_base
+    self.init_model(model, temperature, api_key, api_base)
+
   def init_model(
     self,
     model: str = None,
     temperature: float = None,
     api_key: str = None,
+    api_base: str = None
   ):
     """Initialize or reinitialize the model with new parameters
-    
+
     Args:
         model: Name of model to use (e.g. 'gpt-4')
         temperature: Temperature for model sampling
         api_key: API key for model access
+        api_base: API base for model access
     """
     # Update instance variables if new values provided
     if model is not None:
@@ -51,20 +56,23 @@ class KGGen:
       self.temperature = temperature
     if api_key is not None:
       self.api_key = api_key
-      
+    if api_base is not None:
+      self.api_base = api_base
+
     # Initialize dspy LM with current settings
     if self.api_key:
-      self.lm = dspy.LM(model=self.model, api_key=self.api_key, temperature=self.temperature)
+      self.lm = dspy.LM(model=self.model, api_key=self.api_key, temperature=self.temperature, api_base=self.api_base)
     else:
-      self.lm = dspy.LM(model=self.model, temperature=self.temperature)
-      
+      self.lm = dspy.LM(model=self.model, temperature=self.temperature, api_base=self.api_base)
+
     self.dspy.configure(lm=self.lm)
-    
+
   def generate(
     self,
     input_data: Union[str, List[Dict]],
     model: str = None,
     api_key: str = None,
+    api_base: str = None,
     context: str = "",
     # example_relations: Optional[Union[
     #   List[Tuple[str, str, str]],
@@ -81,7 +89,7 @@ class KGGen:
     output_folder: Optional[str] = None
   ) -> Graph:
     """Generate a knowledge graph from input text or messages.
-    
+
     Args:
         input_data: Text string or list of message dicts
         model: Name of OpenAI model to use
@@ -95,11 +103,11 @@ class KGGen:
         require_edge_type: Whether every edge must have one of the specified types (default True)
         ontology: Valid node-edge-node structure tuples
         output_folder: Path to save partial progress
-        
+
     Returns:
         Generated knowledge graph
     """
-    
+
     # Process input data
     is_conversation = isinstance(input_data, list)
     if is_conversation:
@@ -110,17 +118,19 @@ class KGGen:
           raise ValueError("Messages must be dicts with 'role' and 'content' keys")
         if message['role'] in ['user', 'assistant']:
           text_content.append(f"{message['role']}: {message['content']}")
-      
+
       # Join with newlines to preserve message boundaries
       processed_input = "\n".join(text_content)
     else:
       processed_input = input_data
 
-    if any([model, temperature, api_key]):
+    # Reinitialize dspy with new parameters if any are provided
+    if any([model, temperature, api_key, api_base]):
       self.init_model(
         model=model or self.model,
         temperature=temperature or self.temperature,
-        api_key=api_key or self.api_key
+        api_key=api_key or self.api_key,
+        api_base=api_base or self.api_base,
       )
     
     # Initialize type maps
@@ -210,7 +220,7 @@ class KGGen:
       # Process chunks in parallel using ThreadPoolExecutor
       with ThreadPoolExecutor() as executor:
         results = list(executor.map(process_chunk, chunks))
-        
+
       # Combine results
       for chunk_entities, chunk_relations, chunk_entity_types, chunk_edge_types in results:
         entities.update(chunk_entities)
@@ -243,12 +253,11 @@ class KGGen:
     
     if cluster:
       graph = self.cluster(graph, context)
-    
+
     if output_folder:
       os.makedirs(output_folder, exist_ok=True)
       output_path = os.path.join(output_folder, 'graph.json')
-      
-      # Prepare JSON-serializable dictionary
+
       graph_dict = {
         'entities': list(entities),
         'relations': list(relations),
@@ -269,39 +278,41 @@ class KGGen:
       
       with open(output_path, 'w') as f:
         json.dump(graph_dict, f, indent=2)
-      
+
     return graph
-    
+
   def cluster(
-    self, 
+    self,
     graph: Graph,
     context: str = "",
     model: str = None,
     temperature: float = None,
     api_key: str = None,
+    api_base: str = None
   ) -> Graph:
-    # Initialize dspy with new parameters if any are provided
-    if any([model, temperature, api_key]):
+    # Reinitialize dspy with new parameters if any are provided
+    if any([model, temperature, api_key, api_base]):
       self.init_model(
         model=model or self.model,
         temperature=temperature or self.temperature,
-        api_key=api_key or self.api_key
+        api_key=api_key or self.api_key,
+        api_base=api_base or self.api_base,
       )
 
     return cluster_graph(self.dspy, graph, context)
-  
+
   def aggregate(self, graphs: list[Graph]) -> Graph:
     # Initialize empty sets for combined graph
     all_entities = set()
     all_relations = set()
     all_edges = set()
-    
+
     # Combine all graphs
     for graph in graphs:
       all_entities.update(graph.entities)
       all_relations.update(graph.relations)
       all_edges.update(graph.edges)
-    
+
     # Create and return aggregated graph
     return Graph(
       entities=all_entities,

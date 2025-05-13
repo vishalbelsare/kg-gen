@@ -23,6 +23,8 @@ Examples of models you can pass in:
 - `gemini/gemini-2.0-flash`
 - `ollama_chat/deepseek-r1:14b`
 
+You may specify a custom API base url with `base_url` ([example here](tests/test_custom_api_base.py)).
+
 ## Quick start
 
 Install the module:
@@ -144,6 +146,12 @@ clustered_graph = kg.cluster(
 # }
 # edge_clusters={ ... }
 ```
+
+## Install from this repository:
+
+Clone this repository and install dependencies using `pip install -e '.[dev]'`. 
+
+You may verify that it works by running `python tests/test_basic.py` from the root directory. This will also generate a nice visualization in `tests/test_basic.html`.
 
 ## Features
 
