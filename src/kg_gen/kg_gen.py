@@ -178,7 +178,8 @@ class KGGen:
       graph_dict = {
         'entities': list(entities),
         'relations': list(relations),
-        'edges': list(graph.edges)
+        'edges': list(graph.edges),
+        
       }
       
       with open(output_path, 'w') as f:

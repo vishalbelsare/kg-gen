@@ -550,5 +550,5 @@ if __name__ == "__main__":
     #     retrieve_articles_for_split(split)
     #     clean_rows_article_no_response(split)
 
-    # generate_kgs_for_all_articles(thread_count=1)
+    generate_kgs_for_all_articles(thread_count=1)
     aggregate_all_kgs()
