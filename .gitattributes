@@ -1,3 +1,5 @@
 tests/data/wiki_qa/articles_kg/combined_graph.json filter=lfs diff=lfs merge=lfs -text
+*.json filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
 tests/data/wiki_qa/**/*.zip filter=lfs diff=lfs merge=lfs -text
 tests/data/wiki_qa/**/*.json filter=lfs diff=lfs merge=lfs -text
