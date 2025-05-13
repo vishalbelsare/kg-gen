@@ -1,17 +1,3 @@
-{
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-    
-        {
-            "name": "Python Debugger: Current File",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "python": "${workspaceFolder}/.venv/bin/python"
-        }
-    ]
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:06f5492b8df07af287715e6f63d4daec9e4ac5ef4f35737c62723406629dd950
+size 539
