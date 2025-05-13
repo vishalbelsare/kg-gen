@@ -63,6 +63,7 @@ class KGGen:
   def generate(
     self,
     input_data: Union[str, List[Dict]],
+    input_data_file_path: Optional[str] = None,
     model: str = None,
     api_key: str = None,
     context: str = "",
@@ -149,11 +150,12 @@ class KGGen:
         relations.update(chunk_relations)
         
         # preserve chunk ids
+        chunk_map = (input_data_file_path, i)
         for entity in chunk_entities:
-          entities_chunk_ids[entity] = i
+          entities_chunk_ids[entity] = [chunk_map]
         for relation in chunk_relations:
-          relations_chunk_ids[f"{relation[0]}-{relation[1]}-{relation[2]}"] = i
-          edges_chunk_ids[relation[1]] = i
+          relations_chunk_ids[f"{relation[0]}-{relation[1]}-{relation[2]}"] = [chunk_map]
+          edges_chunk_ids[relation[1]] = [chunk_map]
         
     
     graph = Graph(
