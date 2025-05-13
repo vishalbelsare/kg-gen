@@ -515,6 +515,9 @@ def aggregate_all_kgs():
                 entities=set(graph_data.get("entities", [])),
                 relations=set(tuple(r) for r in graph_data.get("relations", [])),
                 edges=set(graph_data.get("edges", [])),
+                entities_chunk_ids=graph_data.get("entities_chunk_ids", {}),
+                relations_chunk_ids=graph_data.get("relations_chunk_ids", {}),
+                edges_chunk_ids=graph_data.get("edges_chunk_ids", {}),
             )
             graphs.append(graph)
         except Exception as e:
@@ -547,5 +550,5 @@ if __name__ == "__main__":
     #     retrieve_articles_for_split(split)
     #     clean_rows_article_no_response(split)
 
-    generate_kgs_for_all_articles(thread_count=1)
-    # aggregate_all_kgs()
+    # generate_kgs_for_all_articles(thread_count=1)
+    aggregate_all_kgs()

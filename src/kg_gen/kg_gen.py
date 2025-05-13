@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Union, List, Dict, Optional
 from openai import OpenAI
 
@@ -209,15 +210,32 @@ class KGGen:
     all_relations = set()
     all_edges = set()
     
+    all_entities_chunk_ids = defaultdict(list)
+    all_relations_chunk_ids = defaultdict(list)
+    all_edges_chunk_ids = defaultdict(list)
+    
     # Combine all graphs
     for graph in graphs:
       all_entities.update(graph.entities)
       all_relations.update(graph.relations)
       all_edges.update(graph.edges)
+      
+      if not graph.entities_chunk_ids or not graph.relations_chunk_ids or not graph.edges_chunk_ids:
+        continue
+      
+      for entity, chunk_ids in graph.entities_chunk_ids.items():
+        all_entities_chunk_ids[entity].extend(chunk_ids)
+      for relation, chunk_ids in graph.relations_chunk_ids.items():
+        all_relations_chunk_ids[relation].extend(chunk_ids)
+      for edge, chunk_ids in graph.edges_chunk_ids.items():
+        all_edges_chunk_ids[edge].extend(chunk_ids)
     
     # Create and return aggregated graph
     return Graph(
       entities=all_entities,
       relations=all_relations,
-      edges=all_edges
+      edges=all_edges,
+      entities_chunk_ids=all_entities_chunk_ids,
+      relations_chunk_ids=all_relations_chunk_ids,
+      edges_chunk_ids=all_edges_chunk_ids
     )
