@@ -3,7 +3,7 @@ Name: kg-gen
 Version: 0.1.6
 Summary: Extract a knowledge graph using LLMs from any text or messages array
 Author-email: Belinda Mo <justanexperimentpark@gmail.com>
-License: MIT
+License-Expression: MIT
 Project-URL: Homepage, https://github.com/stair-lab/kg-gen
 Project-URL: Issues, https://github.com/stair-lab/kg-gen/issues
 Classifier: Programming Language :: Python :: 3

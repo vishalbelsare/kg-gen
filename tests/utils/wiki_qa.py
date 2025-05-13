@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Literal
-from kg_gen.kg_gen import KGGen, Graph
+from src.kg_gen.kg_gen import KGGen, Graph
 import pandas as pd
 import os
 import requests
