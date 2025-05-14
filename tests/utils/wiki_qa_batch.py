@@ -4,16 +4,50 @@ from typing import Literal
 from src.kg_gen.kg_gen import KGGen, Graph
 import pandas as pd
 import os
+import dspy
 
 ARTICLES_DIR = "tests/data/wiki_qa/articles"
 OUTPUT_KG_DIR = "tests/data/wiki_qa/articles_kg"
 
+
+def generate_vanilla(kg, article, article_path):
+    # Generate KG with chunking
+    return kg.generate(
+        input_data=article,
+        chunk_size=2048,
+        chunk_overlap=246,
+        input_data_file_path=article_path
+    )
+    
+def generate_w_context(kg, article, article_path, title):
+    
+    class SummarizeWikipediaArticle(dspy.Signature):
+        "Explain what the text contents of the Wikipedia article cover"
+        
+        article_title: str = dspy.InputField()
+        article_text: str = dspy.InputField()
+        one_phrase_summary: str = dspy.OutputField()
+        
+    summarizer = dspy.Predict(SummarizeWikipediaArticle)
+
+    summary = summarizer(article_title=title, article_text=article)
+    print(f"Summary for article {title}: {summary.one_phrase_summary}")
+    
+    return kg.generate(
+        input_data=article,
+        chunk_size=2048,
+        chunk_overlap=246,
+        input_data_file_path=article_path,
+        extraction_context=f'This is an excerpt from a Wikipedia article "{title}". {summary}'
+    )
+
+    
 def generate_kgs_for_articles_with_chunks(thread_count: int = 1, articles_dir: str = ARTICLES_DIR, output_kg_dir: str = OUTPUT_KG_DIR):
     """Generate knowledge graphs for all articles in the articles directory."""
     kg = KGGen(
         model="gemini/gemini-2.0-flash-001",
         api_key=os.getenv("GEMINI_API_KEY"),
-        temperature=0.7
+        temperature=0.99
     )
     os.makedirs(output_kg_dir, exist_ok=True)
 
@@ -34,13 +68,8 @@ def generate_kgs_for_articles_with_chunks(thread_count: int = 1, articles_dir: s
             with open(article_path, "r") as f:
                 article = f.read()
 
-            # Generate KG with chunking
-            graph_chunked = kg.generate(
-                input_data=article,
-                chunk_size=2048,
-                chunk_overlap=246,
-                input_data_file_path=article_path
-            )
+            # 💛 sub this out for experiments 💛
+            graph_chunked = generate_w_context(kg, article, article_path, title)
 
             with open(output_kg_path, "w") as f:
                 f.write(graph_chunked.model_dump_json(indent=4))
@@ -151,16 +180,18 @@ def aggregate_all_kgs(output_kg_dir: str):
 if __name__ == "__main__":
     # Generate KGs for all article directories
     article_dirs = [
-        "tests/data/wiki_qa/articles_40k_ch",
-        "tests/data/wiki_qa/articles_400k_ch",
-        "tests/data/wiki_qa/articles_4m_ch",
-        "tests/data/wiki_qa/articles_20m_ch",
-        "tests/data/wiki_qa/articles"
+        # "tests/data/wiki_qa/articles_1"
+        # "tests/data/wiki_qa/articles_40k_ch",
+        # "tests/data/wiki_qa/articles_400k_ch",
+        # "tests/data/wiki_qa/articles_4m_ch",
+        # "tests/data/wiki_qa/articles_20m_ch",
+        # "tests/data/wiki_qa/articles"
+        "tests/data/wiki_qa/articles_w_context"
     ]
     
     for article_dir in article_dirs:
         kg_dir = article_dir + "_kg"
         print(f"\nProcessing articles from {article_dir}")
-        # generate_kgs_for_articles_with_chunks(thread_count=8, articles_dir=article_dir, output_kg_dir=kg_dir)
+        generate_kgs_for_articles_with_chunks(thread_count=128, articles_dir=article_dir, output_kg_dir=kg_dir)
     
         aggregate_all_kgs(output_kg_dir=kg_dir)

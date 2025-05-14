@@ -2,14 +2,13 @@ from typing import List, Literal
 import dspy
 from pydantic import BaseModel, create_model
 
-def extraction_sig(Relation: BaseModel, is_conversation: bool) -> dspy.Signature:
+def extraction_sig(Relation: BaseModel, is_conversation: bool, context: str = "") -> dspy.Signature:
   if not is_conversation:
     
     class ExtractTextRelations(dspy.Signature):
-      """Extract subject-predicate-object triples from the source text. 
+      __doc__ = f"""Extract subject-predicate-object triples from the source text. 
       Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
-      This is for an extraction task, please be thorough, accurate, and faithful to the reference text.
-      """
+      This is for an extraction task, please be thorough, accurate, and faithful to the reference text. {context}"""
       
       source_text: str = dspy.InputField()
       entities: list[str] = dspy.InputField()
@@ -18,13 +17,12 @@ def extraction_sig(Relation: BaseModel, is_conversation: bool) -> dspy.Signature
     return ExtractTextRelations
   else:
     class ExtractConversationRelations(dspy.Signature):
-      """Extract subject-predicate-object triples from the conversation, including:
+      __doc__ = f"""Extract subject-predicate-object triples from the conversation, including:
       1. Relations between concepts discussed
       2. Relations between speakers and concepts (e.g. user asks about X)
       3. Relations between speakers (e.g. assistant responds to user)
       Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
-      This is for an extraction task, please be thorough, accurate, and faithful to the reference text.
-      """
+      This is for an extraction task, please be thorough, accurate, and faithful to the reference text. {context}"""
       
       source_text: str = dspy.InputField()
       entities: list[str] = dspy.InputField()
@@ -33,7 +31,7 @@ def extraction_sig(Relation: BaseModel, is_conversation: bool) -> dspy.Signature
     return ExtractConversationRelations
         
 
-def fallback_extraction_sig(entities, is_conversation) -> dspy.Signature:
+def fallback_extraction_sig(entities, is_conversation, context: str = "") -> dspy.Signature:
   """This fallback extraction does not strictly type the subject and object strings."""
   
   entities_str = "\n- ".join(entities)
@@ -45,10 +43,10 @@ def fallback_extraction_sig(entities, is_conversation) -> dspy.Signature:
     predicate: str
     object: str
     
-  return Relation, extraction_sig(Relation, is_conversation)
+  return Relation, extraction_sig(Relation, is_conversation, context)
   
 
-def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conversation: bool = False) -> List[str]:
+def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conversation: bool = False, context: str = "") -> List[str]:
 
   class Relation(BaseModel):
     """Knowledge graph subject-predicate-object tuple."""
@@ -56,7 +54,7 @@ def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conv
     predicate: str
     object: Literal[tuple(entities)]
   
-  ExtractRelations = extraction_sig(Relation, is_conversation)
+  ExtractRelations = extraction_sig(Relation, is_conversation, context)
   
   try:
     
@@ -65,7 +63,7 @@ def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conv
     return [(r.subject, r.predicate, r.object) for r in result.relations]
   
   except Exception as e:
-    Relation, ExtractRelations = fallback_extraction_sig(entities, is_conversation)
+    Relation, ExtractRelations = fallback_extraction_sig(entities, is_conversation, context)
     extract = dspy.Predict(ExtractRelations)
     result = extract(source_text=input_data, entities=entities)
     

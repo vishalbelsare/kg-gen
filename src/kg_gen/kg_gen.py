@@ -67,18 +67,12 @@ class KGGen:
     input_data_file_path: Optional[str] = None,
     model: str = None,
     api_key: str = None,
-    context: str = "",
-    # example_relations: Optional[Union[
-    #   List[Tuple[str, str, str]],
-    #   List[Tuple[Tuple[str, str], str, Tuple[str, str]]]
-    # ]] = None,
+    extraction_context: str = "",
+    cluster_context: str = "",
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,    
     cluster: bool = False,
     temperature: float = None,
-    # node_types: Optional[List[str]] = None,
-    # edge_types: Optional[List[str]] = None,
-    # ontology: Optional[List[Tuple[str, str, str]]] = None,
     output_folder: Optional[str] = None
   ) -> Graph:
     """Generate a knowledge graph from input text or messages.
@@ -88,11 +82,8 @@ class KGGen:
         model: Name of OpenAI model to use
         api_key (str): OpenAI API key for making model calls
         chunk_size: Max size of text chunks in characters to process
-        context: Description of data context
-        example_relations: Example relationship tuples
-        node_labels: Valid node label strings
-        edge_labels: Valid edge label strings
-        ontology: Valid node-edge-node structure tuples
+        extraction_context: Additional context about the input data to guide entity and relation extraction
+        cluster_context: Additional context about the data to guide entity clustering
         output_folder: Path to save partial progress
         
     Returns:
@@ -127,8 +118,8 @@ class KGGen:
     edges_chunk_ids = {}
     
     if not chunk_size:
-      entities = get_entities(self.dspy, processed_input, is_conversation=is_conversation)
-      relations = get_relations(self.dspy, processed_input, entities, is_conversation=is_conversation)
+      entities = get_entities(self.dspy, processed_input, is_conversation=is_conversation, context=extraction_context)
+      relations = get_relations(self.dspy, processed_input, entities, is_conversation=is_conversation, context=extraction_context)
       
     else:
       chunks = chunk_text(processed_input, chunk_size, chunk_overlap)
@@ -151,7 +142,8 @@ class KGGen:
         relations.update(chunk_relations)
         
         # preserve chunk ids
-        chunk_map = (input_data_file_path, i)
+        effective_input_file_path = input_data_file_path if input_data_file_path is not None else "input_from_string"
+        chunk_map = (effective_input_file_path, i)
         for entity in chunk_entities:
           entities_chunk_ids[entity] = [chunk_map]
         for relation in chunk_relations:
@@ -169,18 +161,23 @@ class KGGen:
     )
     
     if cluster:
-      graph = self.cluster(graph, context)
+      graph = self.cluster(graph, cluster_context)
     
     if output_folder:
       os.makedirs(output_folder, exist_ok=True)
       output_path = os.path.join(output_folder, 'graph.json')
-      
       graph_dict = {
         'entities': list(entities),
         'relations': list(relations),
         'edges': list(graph.edges),
-        
       }
+      
+      if graph.entities_chunk_ids:
+        graph_dict['entities_chunk_ids'] = graph.entities_chunk_ids
+      if graph.relations_chunk_ids:
+        graph_dict['relations_chunk_ids'] = graph.relations_chunk_ids
+      if graph.edges_chunk_ids:
+        graph_dict['edges_chunk_ids'] = graph.edges_chunk_ids
       
       with open(output_path, 'w') as f:
         json.dump(graph_dict, f, indent=2)
