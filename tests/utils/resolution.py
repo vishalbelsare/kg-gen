@@ -13,18 +13,7 @@ import logging
 from pathlib import Path
 from src.kg_gen import Graph
 import dspy
-
-from google import genai
-from google.genai import types
-
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
-# result = client.models.embed_content(
-#         model="gemini-embedding-exp-03-07",
-#         contents="What is the meaning of life?",
-#         config=types.EmbedContentConfig(task_type="SEMANTIC_SIMILARITY")
-# )
-# print(result.embeddings)
+from concurrent.futures import ThreadPoolExecutor
 
 # Set up logging safely
 logger = logging.getLogger('kg_rag')
@@ -36,7 +25,7 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 
 class KGAssistedRAG:
-    def __init__(self, knowledge_graph_path: str, openai_api_key: str = None):
+    def __init__(self, openai_api_key: str = None):
         """
         Initialize KG-assisted RAG with cached embeddings, BM25 tokens, and text chunk store.
         """
@@ -45,15 +34,7 @@ class KGAssistedRAG:
         
         with open(kg_path, 'r', encoding='utf-8') as f:
             kg_data = json.load(f)
-        # self.kg = self._load_knowledge_graph(knowledge_graph_path)
 
-        self.encoder = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-        
-        # Extract triples and texts
-        # self.triples = [(u, d.get('relationship', 'related_to'), v) for u, v, d in self.kg.edges(data=True)]
-        # self.triple_texts = [f"{h} {r} {t}" for h, r, t in self.triples]
-        # print(f"Loaded {len(self.triples)} triples from knowledge graph")
-        # print(f"Sample triple: {self.triples[0] if self.triples else 'No triples found'}")
         self.kg = kg_data
         self.nodes: list[str] = kg_data.get("entities")
         self.edges: list[str] = kg_data.get("edges")
@@ -63,15 +44,17 @@ class KGAssistedRAG:
         print(f"Sample edge: {self.edges[0] if self.edges else 'No edges found'}")
         
         # Cache embeddings and BM25 tokens
-        self.node_embeddings = self.encoder.encode(self.nodes, show_progress_bar=True)
+        self.node_encoder = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        self.node_embeddings = self.node_encoder.encode(self.nodes, show_progress_bar=True)
         self.node_bm25_tokenized = [text.lower().split() for text in self.nodes]
         self.node_bm25 = BM25Okapi(self.node_bm25_tokenized)
         
-        self.edge_embeddings = self.encoder.encode(self.edges, show_progress_bar=True)
+        self.edge_encoder = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+        self.edge_embeddings = self.edge_encoder.encode(self.edges, show_progress_bar=True)
         self.edge_bm25_tokenized = [text.lower().split() for text in self.edges]
         self.edge_bm25 = BM25Okapi(self.edge_bm25_tokenized)
   
-    def get_relevant_items(self, query: str, top_k: int = 50, type: str = "node") -> List[Tuple[str, str, str]]:
+    def get_relevant_items(self, query: str, top_k: int = 50, type: str = "node") -> list[str]:
         """
         Use rank fusion of BM25 + embedding to retrieve top-k nodes.
         """
@@ -81,7 +64,8 @@ class KGAssistedRAG:
         bm25_scores = self.node_bm25.get_scores(query_tokens) if type == "node" else self.edge_bm25.get_scores(query_tokens)
  
         # Embedding
-        query_embedding = self.encoder.encode([query], show_progress_bar=False)
+        encoder = self.node_encoder if type == "node" else self.edge_encoder
+        query_embedding = encoder.encode([query], show_progress_bar=False)
         embeddings = self.node_embeddings if type == "node" else self.edge_embeddings
         embedding_scores = cosine_similarity(query_embedding, embeddings).flatten()
 
@@ -92,39 +76,103 @@ class KGAssistedRAG:
 
         return top_items
 
+    # def parallelize(self, threads=256):
+    
+        
     def deduplicate(self) -> Graph:
         kg = self.kg.copy()
         lm = dspy.LM(model="gemini/gemini-2.0-flash")
         dspy.configure(lm=lm)
         
-        class DeduplicateEntities(dspy.Signature):
-            """Deduplicate entities. Find and return duplicates and an alias that best represents the duplicates. Return an empty list if there are none. 
-            Examples:
-            TODO
-            """
-            entities: list[str] = dspy.InputField()
-            duplicates: list[str] = dspy.OutputField()
-            alias: list[str] = dspy.OutputField()
+        entities = set()
+        edges = set()
+        entity_clusters = {}
+        edge_clusters = {}
+        
+        # 'Obama': ['B. Obama', 'Barack Obama', ... 'Michelle Obama']
+        # 'Barack Obama': ['Obama']
+        
+        # option 1
+        # get top 25 for every entity
+
+        # option 2
+        # merge all duplicates with union
+        
+        # option 3
+        # cluster optimally
+        
+        
+        while len(kg.entities) < 0:
             
-        deduplicate = dspy.Predict(DeduplicateEntities)
-        deduplicated_entities = deduplicate(entities=self.nodes).duplicates
-        
-        class DeduplicateEdges(dspy.Signature):
-            """Deduplicate edges. Find and return duplicates and an alias that best represents the duplicates. Return an empty list if there are none. 
-            Examples:
-            TODO
-            """
-            edges: list[str] = dspy.InputField()
-            duplicates: list[str] = dspy.OutputField()
-            alias: list[str] = dspy.OutputField()
+            entity = kg.entities.pop()
             
-        deduplicate_edges = dspy.Predict(DeduplicateEdges)
-        deduplicated_edges = deduplicate_edges(edges=self.edges).duplicates
-        
-        
+            relevant_entities = self.get_relevant_items(entity, 25, "node") + [entity]
+            
+            class DeduplicateEntities(dspy.Signature):
+                """Find duplicate entities and an alias that best represents the duplicates. Duplicates are those that are the same in meaning, such as with variation in tense, plural form, stem form, case, abbreviation, shorthand. Return an empty list if there are none. 
+                """
+                entities: list[str] = dspy.InputField()
+                duplicates: list[str] = dspy.OutputField()
+                alias: list[str] = dspy.OutputField(description="Best entity name to represent the duplicates set, ideally from the entities")
+                
+            deduplicate = dspy.Predict(DeduplicateEntities)
+            result = deduplicate(entities=relevant_entities)
+            entities.add(result.alias)
+            for duplicate in result.duplicates:
+                if duplicate in kg.entities:
+                    kg.entities.remove(duplicate)
+                    entity_clusters[result.alias].add(duplicate)
+            
+        while len(kg.edges) < 0:
+            
+            edge = kg.edges.pop()
+            
+            relevant_edges = self.get_relevant_items(edge, 25, "edge") + [edge]
+            
+            class DeduplicateEdges(dspy.Signature):
+                """Find duplicate edges and an alias that best represents the duplicates. Duplicates are those that are the same in meaning, such as with variation in tense, plural form, stem form, case, abbreviation, shorthand. Return an empty list if there are none. 
+                """
+                edges: list[str] = dspy.InputField()
+                duplicates: list[str] = dspy.OutputField()
+                alias: list[str] = dspy.OutputField(description="Best edge name to represent the duplicates set, ideally from the edges")
+                
+            deduplicate = dspy.Predict(DeduplicateEdges)
+            result = deduplicate(edges=relevant_edges)
+            edges.add(result.alias)
+            for duplicate in result.duplicates:
+                if duplicate in kg.edges:
+                    kg.edges.remove(duplicate)
+                    edge_clusters[result.alias].add()
+            
+        # Update relations based on clusters
+        relations: set[tuple[str, str, str]] = set()
+        for s, p, o in kg.relations:
+            # Look up subject in entity clusters
+            if s not in entities:
+                for rep, cluster in entity_clusters.items():
+                    if s in cluster:
+                        s = rep
+                        break
+                
+            # Look up predicate in edge clusters
+            if p not in edges:
+                for rep, cluster in edge_clusters.items():
+                    if p in cluster:
+                        p = rep
+                        break
+                
+            # Look up object in entity clusters
+            if o not in entities:
+                for rep, cluster in entity_clusters.items():
+                    if o in cluster:
+                        o = rep
+                        break
+                
+            relations.add((s, p, o))
+            
         graph = Graph(entities=deduplicated_entities, edges=deduplicated_edges)
         return graph
-            
+             
     
     
     # def generate_response(self, query: str, prompt: str = None, max_tokens: int = 500) -> str:
