@@ -40,7 +40,6 @@ def generate_w_context(kg, article, article_path, title):
         input_data_file_path=article_path,
         extraction_context=f'This is an excerpt from a Wikipedia article "{title}". {summary}'
     )
-
     
 def generate_kgs_for_articles_with_chunks(thread_count: int = 1, articles_dir: str = ARTICLES_DIR, output_kg_dir: str = OUTPUT_KG_DIR):
     """Generate knowledge graphs for all articles in the articles directory."""
