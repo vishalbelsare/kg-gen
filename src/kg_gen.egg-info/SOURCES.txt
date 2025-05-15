@@ -22,5 +22,6 @@ tests/test_basic_convo.py
 tests/test_chunk_and_cluster.py
 tests/test_chunked.py
 tests/test_clustering.py
+tests/test_context.py
 tests/test_gen_clus_agg.py
 tests/test_multiple_models.py
