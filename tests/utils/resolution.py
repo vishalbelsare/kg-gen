@@ -244,20 +244,26 @@ class KGAssistedRAG:
 
     def deduplicate_cluster(self, cluster: list[str], type: str = "node") -> tuple[set, dict[str, list[str]]]:
         cluster = cluster.copy()
-        # print("clustering", cluster)
         
         items = set()
         item_clusters = {}
         plural_type = "entities" if type == "node" else "edges"
         singular_type = "entity" if type == "node" else "edge"
         
+        print(f"Starting deduplication of {len(cluster)} {plural_type} in cluster")
+        
+        processed_count = 0
         while len(cluster) > 0:
-            
+            processed_count += 1
             item = cluster.pop()
+            
+            print(f"[{processed_count}/{processed_count + len(cluster)}] Processing {singular_type}: '{item}'")
             
             relevant_items = self.get_relevant_items(item, 16, type)
             
-            print(f'relevant items for {item}: {relevant_items}')
+            print(f"  Found {len(relevant_items)} relevant {plural_type} for '{item}'")
+            if len(relevant_items) > 0:
+                print(f"  Sample relevant items: {relevant_items[:3]}" + ("..." if len(relevant_items) > 3 else ""))
             
             class Deduplicate(dspy.Signature):
                 __doc__ = f"""Find duplicate {plural_type} for the item and an alias that best represents the duplicates. Duplicates are those that are the same in meaning, such as with variation in tense, plural form, stem form, case, abbreviation, shorthand. Return an empty list if there are none. 
@@ -270,21 +276,24 @@ class KGAssistedRAG:
             deduplicate = dspy.Predict(Deduplicate)
             result = deduplicate(item=item, set=relevant_items)
             items.add(result.alias)
-            print(f'result for {item}: {result.duplicates}')
             
             # Filter duplicates to only include those that exist in the cluster
             duplicates = [dup for dup in result.duplicates if dup in cluster]
+            
             if len(duplicates) > 0:
+                print(f"  ✓ Found {len(duplicates)} duplicates for '{item}'")
+                print(f"  → Using alias '{result.alias}' to represent: '{item}' and {duplicates}")
                 item_clusters[result.alias] = {item}
                 for duplicate in duplicates:
                     cluster.remove(duplicate)
                     item_clusters[result.alias].add(duplicate)
             else:
+                print(f"  ✗ No duplicates found for '{item}', keeping as is")
                 item_clusters[item] = {item}
-                
-                
+        
+        print(f"Deduplication complete: {len(items)} unique {plural_type} from original {processed_count}")
+        
         return items, item_clusters
-       
 
     def deduplicate(self) -> Graph:
         lm = dspy.LM(model="gemini/gemini-2.0-flash", api_key=os.getenv("GOOGLE_API_KEY"))
@@ -320,7 +329,7 @@ class KGAssistedRAG:
                 entity_clusters = {}
                 edge_clusters = {}
         
-        pool = ThreadPoolExecutor(max_workers=1)
+        pool = ThreadPoolExecutor(max_workers=64)
         
         # Process node clusters in parallel
         node_futures = []
@@ -462,9 +471,9 @@ if __name__ == "__main__":
         # "tests/data/wiki_qa/aggregated/articles_1_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_40k_ch_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_400k_ch_kg.json",
-        # "tests/data/wiki_qa/aggregated/articles_4m_ch_kg.json",
+        "tests/data/wiki_qa/aggregated/articles_4m_ch_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_20m_ch_kg.json",
-        "tests/data/wiki_qa/aggregated/articles_all_kg.json",
+        # "tests/data/wiki_qa/aggregated/articles_all_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_w_context_kg.json",
     ]
     
