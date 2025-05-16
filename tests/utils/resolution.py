@@ -54,15 +54,75 @@ class KGAssistedRAG:
         print(f"Loaded {len(self.edges)} edges from knowledge graph") 
         print(f"Sample edge: {self.edges[0] if self.edges else 'No edges found'}")
         
-        # Cache embeddings and BM25 tokens
+        # Create output directory if it doesn't exist
+        os.makedirs(self.output_folder, exist_ok=True)
+        
+        # Cache embeddings and BM25 tokens for nodes
         self.node_encoder = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-        self.node_embeddings = self.node_encoder.encode(self.nodes, show_progress_bar=True)
-        self.node_bm25_tokenized = [text.lower().split() for text in self.nodes]
+        
+        # Define cache file paths for nodes
+        node_embeddings_cache_path = os.path.join(self.output_folder, "node_embeddings.npy")
+        node_bm25_tokens_cache_path = os.path.join(self.output_folder, "node_bm25_tokens.json")
+        
+        # Check if cached node embeddings exist
+        if os.path.exists(node_embeddings_cache_path):
+            print(f"Loading node embeddings from cache: {node_embeddings_cache_path}")
+            self.node_embeddings = np.load(node_embeddings_cache_path)
+        else:
+            print("Generating node embeddings...")
+            self.node_embeddings = self.node_encoder.encode(self.nodes, show_progress_bar=True)
+            # Save embeddings to cache
+            np.save(node_embeddings_cache_path, self.node_embeddings)
+            print(f"Saved node embeddings to cache: {node_embeddings_cache_path}")
+            
+        # Check if cached BM25 tokens for nodes exist
+        if os.path.exists(node_bm25_tokens_cache_path):
+            print(f"Loading node BM25 tokens from cache: {node_bm25_tokens_cache_path}")
+            with open(node_bm25_tokens_cache_path, 'r') as f:
+                self.node_bm25_tokenized = json.load(f)
+        else:
+            print("Generating node BM25 tokens...")
+            self.node_bm25_tokenized = [text.lower().split() for text in self.nodes]
+            # Save tokens to cache
+            with open(node_bm25_tokens_cache_path, 'w') as f:
+                json.dump(self.node_bm25_tokenized, f)
+            print(f"Saved node BM25 tokens to cache: {node_bm25_tokens_cache_path}")
+                
+        # Always rebuild BM25 from tokens (it's fast and simpler than serializing the object)
         self.node_bm25 = BM25Okapi(self.node_bm25_tokenized)
         
+        # Cache embeddings and BM25 tokens for edges
         self.edge_encoder = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
-        self.edge_embeddings = self.edge_encoder.encode(self.edges, show_progress_bar=True)
-        self.edge_bm25_tokenized = [text.lower().split() for text in self.edges]
+        
+        # Define cache file paths for edges
+        edge_embeddings_cache_path = os.path.join(self.output_folder, "edge_embeddings.npy")
+        edge_bm25_tokens_cache_path = os.path.join(self.output_folder, "edge_bm25_tokens.json")
+        
+        # Check if cached edge embeddings exist
+        if os.path.exists(edge_embeddings_cache_path):
+            print(f"Loading edge embeddings from cache: {edge_embeddings_cache_path}")
+            self.edge_embeddings = np.load(edge_embeddings_cache_path)
+        else:
+            print("Generating edge embeddings...")
+            self.edge_embeddings = self.edge_encoder.encode(self.edges, show_progress_bar=True)
+            # Save embeddings to cache
+            np.save(edge_embeddings_cache_path, self.edge_embeddings)
+            print(f"Saved edge embeddings to cache: {edge_embeddings_cache_path}")
+            
+        # Check if cached BM25 tokens for edges exist
+        if os.path.exists(edge_bm25_tokens_cache_path):
+            print(f"Loading edge BM25 tokens from cache: {edge_bm25_tokens_cache_path}")
+            with open(edge_bm25_tokens_cache_path, 'r') as f:
+                self.edge_bm25_tokenized = json.load(f)
+        else:
+            print("Generating edge BM25 tokens...")
+            self.edge_bm25_tokenized = [text.lower().split() for text in self.edges]
+            # Save tokens to cache
+            with open(edge_bm25_tokens_cache_path, 'w') as f:
+                json.dump(self.edge_bm25_tokenized, f)
+            print(f"Saved edge BM25 tokens to cache: {edge_bm25_tokens_cache_path}")
+                
+        # Always rebuild BM25 from tokens
         self.edge_bm25 = BM25Okapi(self.edge_bm25_tokenized)
   
     def get_relevant_items(self, query: str, top_k: int = 50, type: str = "node") -> list[str]:
@@ -184,6 +244,7 @@ class KGAssistedRAG:
 
     def deduplicate_cluster(self, cluster: list[str], type: str = "node") -> tuple[set, dict[str, list[str]]]:
         cluster = cluster.copy()
+        # print("clustering", cluster)
         
         items = set()
         item_clusters = {}
@@ -196,6 +257,8 @@ class KGAssistedRAG:
             
             relevant_items = self.get_relevant_items(item, 16, type)
             
+            print(f'relevant items for {item}: {relevant_items}')
+            
             class Deduplicate(dspy.Signature):
                 __doc__ = f"""Find duplicate {plural_type} for the item and an alias that best represents the duplicates. Duplicates are those that are the same in meaning, such as with variation in tense, plural form, stem form, case, abbreviation, shorthand. Return an empty list if there are none. 
                 """
@@ -207,6 +270,7 @@ class KGAssistedRAG:
             deduplicate = dspy.Predict(Deduplicate)
             result = deduplicate(item=item, set=relevant_items)
             items.add(result.alias)
+            print(f'result for {item}: {result.duplicates}')
             
             # Filter duplicates to only include those that exist in the cluster
             duplicates = [dup for dup in result.duplicates if dup in cluster]
@@ -256,7 +320,7 @@ class KGAssistedRAG:
                 entity_clusters = {}
                 edge_clusters = {}
         
-        pool = ThreadPoolExecutor(max_workers=500)
+        pool = ThreadPoolExecutor(max_workers=1)
         
         # Process node clusters in parallel
         node_futures = []
@@ -284,7 +348,6 @@ class KGAssistedRAG:
                 entity_clusters.update(cluster_entity_map)
                 
                 # Save progress every 10 processed results
-                # if (i + 1) % 10 == 0:
                 print(f"Processed {i+1}/{len(node_futures)} node cluster results")
                 self._save_intermediate_progress(entities, edges, entity_clusters, edge_clusters)
                     
@@ -401,7 +464,7 @@ if __name__ == "__main__":
         # "tests/data/wiki_qa/aggregated/articles_400k_ch_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_4m_ch_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_20m_ch_kg.json",
-        # "tests/data/wiki_qa/aggregated/articles_all_kg.json",
+        "tests/data/wiki_qa/aggregated/articles_all_kg.json",
         # "tests/data/wiki_qa/aggregated/articles_w_context_kg.json",
     ]
     
