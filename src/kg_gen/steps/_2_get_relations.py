@@ -1,45 +1,71 @@
-from typing import List, Literal
+from typing import List
 import dspy
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel
 
+def extraction_sig(Relation: BaseModel, is_conversation: bool, context: str = "") -> dspy.Signature:
+  if not is_conversation:
+    
+    class ExtractTextRelations(dspy.Signature):
+      __doc__ = f"""Extract subject-predicate-object triples from the source text. 
+      Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
+      This is for an extraction task, please be thorough, accurate, and faithful to the reference text. {context}"""
+      
+      source_text: str = dspy.InputField()
+      entities: list[str] = dspy.InputField()
+      relations: list[Relation] = dspy.OutputField(desc="List of subject-predicate-object tuples. Be thorough.")
 
-def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conversation: bool = False) -> List[str]:
-  
-  class Relation(BaseModel):
-    "Knowledge graph subject-predicate-object tuple"
-    subject: Literal[tuple(entities)]
-    predicate: str
-    object: Literal[tuple(entities)]
-    
-  class ExtractTextRelations(dspy.Signature):
-    """Extract subject-predicate-object triples from the source text. Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
-    This is for an extraction task, please be thorough, accurate, and faithful to the reference text."""
-    
-    source_text: str = dspy.InputField()
-    entities: list[str] = dspy.InputField()
-    relations: list[Relation] = dspy.OutputField(desc="List of subject-predicate-object tuples. Be thorough.")
-
-  class ExtractConversationRelations(dspy.Signature):
-    """Extract subject-predicate-object triples from the conversation, including:
-    1. Relations between concepts discussed
-    2. Relations between speakers and concepts (e.g. user asks about X)
-    3. Relations between speakers (e.g. assistant responds to user)
-    Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
-    This is for an extraction task, please be thorough, accurate, and faithful to the reference text.
-    """
-    
-    source_text: str = dspy.InputField()
-    entities: list[str] = dspy.InputField()
-    relations: list[Relation] = dspy.OutputField(desc="List of subject-predicate-object tuples where subject and object are exact matches to items in entities list. Be thorough")
-  if is_conversation:
-    extract = dspy.Predict(ExtractConversationRelations)
+    return ExtractTextRelations
   else:
-    extract = dspy.Predict(ExtractTextRelations)
+    class ExtractConversationRelations(dspy.Signature):
+      __doc__ = f"""Extract subject-predicate-object triples from the conversation, including:
+      1. Relations between concepts discussed
+      2. Relations between speakers and concepts (e.g. user asks about X)
+      3. Relations between speakers (e.g. assistant responds to user)
+      Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
+      This is for an extraction task, please be thorough, accurate, and faithful to the reference text. {context}"""
+      
+      source_text: str = dspy.InputField()
+      entities: list[str] = dspy.InputField()
+      relations: list[Relation] = dspy.OutputField(desc="List of subject-predicate-object tuples where subject and object are exact matches to items in entities list. Be thorough")
+      
+    return ExtractConversationRelations
+
+def get_relations(dspy: dspy.dspy, input_data: str, entities: list[str], is_conversation: bool = False, context: str = "") -> List[str]:
+
+  entities_str = "\n- ".join(entities)
+  class Relation(BaseModel):
+    __doc__ = f"""Knowledge graph subject-predicate-object tuple.\nSubject and object entities must be one of: {entities_str}"""
     
-  result = extract(source_text=input_data, entities=entities)
-  # Assuming result.relations is a list of Relation objects
-  filtered_relations = [
-    (rel.subject, rel.predicate, rel.object) for rel in result.relations 
-    if rel.subject in entities and rel.object in entities
-  ]
-  return filtered_relations
+    subject: str
+    predicate: str
+    object: str
+    
+  ExtractRelations = extraction_sig(Relation, is_conversation, context)
+  
+  try:
+    
+    extract = dspy.Predict(ExtractRelations)
+    result = extract(source_text=input_data, entities=entities)
+    
+    class FixedRelations(dspy.Signature):
+      """Fix the relations so that every subject and object of the relations are exact matches to an entity. Keep the predicate the same. The meaning of every relation should stay faithful to the reference text. If you cannot maintain the meaning of the original relation relative to the source text, then do not return it."""
+      
+      source_text: str = dspy.InputField()
+      entities: list[str] = dspy.InputField()
+      relations: list[Relation] = dspy.InputField()
+      fixed_relations: list[Relation] = dspy.OutputField()
+    
+    fix = dspy.ChainOfThought(FixedRelations)
+      
+    fix_res = fix(source_text=input_data, entities=entities, relations=result.relations)
+      
+    good_relations = []
+    for rel in fix_res.fixed_relations:
+      if rel.subject in entities and rel.object in entities:
+        good_relations.append(rel)
+    return [(r.subject, r.predicate, r.object) for r in good_relations]
+  
+  except Exception as e:
+    print(f"Error extracting relations: {e}")
+    # Fallback to empty relations list when extraction fails
+    return []
