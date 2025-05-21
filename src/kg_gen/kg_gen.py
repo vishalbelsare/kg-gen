@@ -1,5 +1,4 @@
 from typing import Union, List, Dict, Optional
-from openai import OpenAI
 
 from .steps._1_get_entities import get_entities
 from .steps._2_get_relations import get_relations
@@ -141,9 +140,10 @@ class KGGen:
         chunk_entities = get_entities(self.dspy, chunk, is_conversation=is_conversation)
         chunk_relations = get_relations(self.dspy, chunk, chunk_entities, is_conversation=is_conversation)
         return chunk_entities, chunk_relations
-
+      
       # Process chunks in parallel using ThreadPoolExecutor
-      with ThreadPoolExecutor() as executor:
+      # Use max_workers=None to let the system determine the optimal number of threads
+      with ThreadPoolExecutor(max_workers=None) as executor:
         results = list(executor.map(process_chunk, chunks))
 
       # Combine results

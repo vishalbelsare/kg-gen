@@ -34,6 +34,14 @@ def test_basic_clustering():
   # Test clustering
   clustered = kg_gen.cluster(graph)
   
+  print("\nDEBUG test_basic_clustering:")
+  print(f"Original entities: {graph.entities}")
+  print(f"Clustered entities: {clustered.entities}")
+  print(f"Entity clusters: {clustered.entity_clusters}")
+  print(f"Original edges: {graph.edges}")
+  print(f"Clustered edges: {clustered.edges}")
+  print(f"Edge clusters: {clustered.edge_clusters}")
+  
   # Check that similar entities were clustered
   assert len(clustered.entities) < len(graph.entities)
   assert "cat" in clustered.entities  # Representative form
@@ -102,6 +110,14 @@ def test_method_level_configuration():
     api_key=TEST_API_KEY
   )
   
+  print("\nDEBUG test_method_level_configuration:")
+  print(f"Original entities: {graph.entities}")
+  print(f"Clustered entities: {clustered.entities}")
+  print(f"Entity clusters: {clustered.entity_clusters}")
+  print(f"Original edges: {graph.edges}")
+  print(f"Clustered edges: {clustered.edges}")
+  print(f"Edge clusters: {clustered.edge_clusters}")
+  
   assert len(clustered.entities) < len(graph.entities)
   assert len(clustered.edges) < len(graph.edges)
   assert clustered.entity_clusters is not None
@@ -126,6 +142,16 @@ def test_case_sensitivity_clustering():
   )
   
   clustered = kg_gen.cluster(graph)
+  
+  print("\nDEBUG test_case_sensitivity_clustering:")
+  print(f"Original entities: {graph.entities}")
+  print(f"Clustered entities: {clustered.entities}")
+  print(f"Entity clusters: {clustered.entity_clusters}")
+  print(f"Original edges: {graph.edges}")
+  print(f"Clustered edges: {clustered.edges}")
+  print(f"Edge clusters: {clustered.edge_clusters}")
+  print(f"Original relations: {graph.relations}")
+  print(f"Clustered relations: {clustered.relations}")
   
   # Check that case variations were clustered
   assert len(clustered.entities) == 2  # Should cluster to just person and book
@@ -184,6 +210,14 @@ def test_semantic_clustering():
   )
   
   clustered = kg_gen.cluster(graph, context="cluster based on sentiment, semantic similarity")
+  
+  print("\nDEBUG test_semantic_clustering:")
+  print(f"Original entities: {graph.entities}")
+  print(f"Clustered entities: {clustered.entities}")
+  print(f"Entity clusters: {clustered.entity_clusters}")
+  print(f"Original edges: {graph.edges}")
+  print(f"Clustered edges: {clustered.edges}")
+  print(f"Edge clusters: {clustered.edge_clusters}")
   
   # Check that semantically similar terms were clustered
   assert len(clustered.entities) < len(graph.entities)
@@ -377,6 +411,14 @@ def test_large_scale_clustering():
   """
   
   clustered = kg_gen.cluster(graph, context=context)
+  
+  print("\nDEBUG test_large_scale_clustering:")
+  print(f"Original entities: {graph.entities}")
+  print(f"Clustered entities: {clustered.entities}")
+  print(f"Entity clusters: {clustered.entity_clusters}")
+  print(f"Original edges: {graph.edges}")
+  print(f"Clustered edges: {clustered.edges}")
+  print(f"Edge clusters: {clustered.edge_clusters}")
   
   # Basic assertions
   assert len(clustered.entities) < len(graph.entities)
