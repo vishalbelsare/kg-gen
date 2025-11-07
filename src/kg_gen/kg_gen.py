@@ -1,15 +1,15 @@
 from typing import Union, List, Dict, Optional
 
-from .steps._1_get_entities import get_entities
-from .steps._2_get_relations import get_relations
-from .steps._3_cluster_graph import cluster_graph
-from .utils.chunk_text import chunk_text
-from .utils.visualize_kg import visualize as visualize_kg
-from .models import Graph
+from kg_gen.steps._1_get_entities import get_entities
+from kg_gen.steps._2_get_relations import get_relations
+from kg_gen.steps._3_deduplicate import dedup_cluster_graph
+from kg_gen.utils.chunk_text import chunk_text
+from kg_gen.utils.visualize_kg import visualize as visualize_kg
+from kg_gen.models import Graph
 import dspy
 import json
 import os
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import networkx as nx
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -203,37 +203,30 @@ class KGGen:
                 api_base=api_base or self.api_base,
             )
 
-        if not chunk_size:
-            with dspy.context(lm=self.lm):
-                entities = get_entities(
-                    processed_input, is_conversation=is_conversation
-                )
+        def _process(content, lm):
+            with dspy.context(lm=lm):
+                entities = get_entities(content, is_conversation)
                 relations = get_relations(
-                    processed_input, entities, is_conversation=is_conversation
+                    content, entities, is_conversation=is_conversation
                 )
+                return entities, relations
+
+        if not chunk_size:
+            entities, relations = _process(processed_input, self.lm)
         else:
             chunks = chunk_text(processed_input, chunk_size)
             entities = set()
             relations = set()
 
-            def process_chunk(chunk, lm):
-                with dspy.context(lm=lm):
-                    chunk_entities = get_entities(chunk, is_conversation)
-                    chunk_relations = get_relations(
-                        chunk, chunk_entities, is_conversation=is_conversation
-                    )
-                    return chunk_entities, chunk_relations
-
-            # Process chunks in parallel using ThreadPoolExecutor
             with ThreadPoolExecutor() as executor:
-                results = list(
-                    executor.map(process_chunk, chunks, [self.lm] * len(chunks))
-                )
+                future_to_chunk = {
+                    executor.submit(_process, chunk, self.lm): chunk for chunk in chunks
+                }
 
-            # Combine results
-            for chunk_entities, chunk_relations in results:
-                entities.update(chunk_entities)
-                relations.update(chunk_relations)
+                for future in as_completed(future_to_chunk):
+                    chunk_entities, chunk_relations = future.result()
+                    entities.update(chunk_entities)
+                    relations.update(chunk_relations)
 
         graph = Graph(
             entities=entities,
@@ -285,8 +278,11 @@ class KGGen:
                 api_base=api_base or self.api_base,
             )
 
-        with dspy.context(lm=self.lm):
-            return cluster_graph(graph, context)
+        if self.retrieval_model is None:
+            raise ValueError("No retrieval model provided")
+        return dedup_cluster_graph(
+            retrieval_model=self.retrieval_model, lm=self.lm, graph=graph
+        )
 
     def aggregate(self, graphs: list[Graph]) -> Graph:
         # Initialize empty sets for combined graph
